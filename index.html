@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech - Dialogue with Avatars and Voice Selection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .dialogue {
+            display: flex;
+            align-items: flex-start;
+            margin: 20px 0;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #555;
+        }
+
+        .content {
+            max-width: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .speaker {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .text {
+            margin-left: 20px;
+            flex-grow: 1;
+        }
+
+        .play-icon {
+            cursor: pointer;
+            color: #007BFF;
+            font-size: 24px;
+            margin-left: 10px;
+        }
+
+        .play-icon:hover {
+            color: #0056b3;
+        }
+
+        .play-all-btn {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .play-all-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Leo and Mia's Dialogue</h1>
+    <h1><a href="/recognize-speech.html">Speech Recognition Example</a></h1>
+
+    <button class="play-all-btn" onclick="playAllDialogue()">Play All</button>
+
+    <div id="dialogue-container"></div>
+
+    <script>
+        // JSON data
+        const dialogueData = {
+            "setting": "Two friends, Leo and Mia, are walking home from school.",
+            "dialogue": [
+                { "speaker": "Leo", "text": "Wow, it's so hot today.  It's 4 o'clock, and it's still sunny." },
+                { "speaker": "Mia", "text": "I know, I'm thirsty.  I haven't got any juice left." },
+                { "speaker": "Leo", "text": "We can stop at the shop on the corner. They've got yummy iced tea there." },
+                { "speaker": "Mia", "text": "That's a great idea!  I like the mango iced tea. Do you like iced tea?" },
+                { "speaker": "Leo", "text": "I do, but I usually get a lemonade.  It's refreshing." },
+                { "speaker": "Mia", "text": "What's the weather like tomorrow?  I'm hoping it's not too hot." },
+                { "speaker": "Leo", "text": "I think it's going to be cooler.  The forecast said it might rain in the afternoon." },
+                { "speaker": "Mia", "text": "That's good, I'm looking forward to reading a book inside tomorrow.   I've got a new one I want to start!" },
+                { "speaker": "Leo", "text": "Sounds fun. I've got a new book too.  But it's too long, I'm going to try and finish the one I'm reading first." },
+                { "speaker": "Mia", "text": "Okay, I'm looking forward to seeing what you think of it!" },
+                { "speaker": "Leo", "text": "You too!  Let's go to the shop, I need to buy a juice and maybe a chocolate bar.  I'm hungry!" },
+                { "speaker": "Mia", "text": "Me too!  It's been a long day!" }
+            ]
+        };
+
+        let voices = [];
+
+
+        // Function to render the dialogue as HTML with avatars and play icons
+        function renderDialogue() {
+            const container = document.getElementById("dialogue-container");
+            container.innerHTML = `<p><strong>Setting:</strong> ${dialogueData.setting}</p>`;
+
+            dialogueData.dialogue.forEach((line, index) => {
+
+                const dialogueHTML = `
+                    <div class="dialogue">
+                        <div class="content">
+                            <p class="speaker">${line.speaker}:</p>
+                            <p class="text">${line.text}</p>
+                            <span class="play-icon" onclick="playLine(${index})">▶️</span>
+                             <button class="recognize-btn" data-lang="en-US">Start Speech Recognition (English)</button>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += dialogueHTML;
+            });
+        }
+
+        // Function to stop current speech and play the specific line of dialogue
+        function playLine(index) {
+
+            const line = dialogueData.dialogue[index];
+
+            // Stop current speech
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(`${line.text}`);
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Function to play all dialogue lines in sequence, stopping any current speech
+        function playAllDialogue() {
+
+            let index = 0;
+
+            // Stop any current speech
+            window.speechSynthesis.cancel();
+
+            function playNextLine() {
+                if (index < dialogueData.dialogue.length) {
+                    const line = dialogueData.dialogue[index];
+                    const utterance = new SpeechSynthesisUtterance(`${line.text}`);
+
+                    utterance.onend = () => {
+                        index++;
+                        playNextLine(); // Play the next line after the current one finishes
+                    };
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+
+            playNextLine(); // Start playing the first line
+        }
+
+        // Event listeners for voice loading
+        window.speechSynthesis.onvoiceschanged = () => {
+            populateVoiceList();
+        };
+
+        // Render the dialogue on page load
+        renderDialogue();
+    </script>
+    <script>
+        // Function to start speech recognition
+        function startRecognition(language, outputElement) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = language;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.start();
+            outputElement.innerText = 'Listening...';
+
+            recognition.onresult = (event) => {
+                const speechToText = event.results[0][0].transcript;
+                outputElement.innerText = `You said: ${speechToText}`;
+            };
+
+            recognition.onerror = (event) => {
+                outputElement.innerText = 'Error: ' + event.error;
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+                outputElement.innerText = 'Processing...';
+            };
+        }
+
+        // Select all buttons with the class 'recognize-btn'
+        const buttons = document.querySelectorAll('.recognize-btn');
+        const outputs = document.querySelectorAll('.output');
+
+        // Attach event listeners to all buttons
+        buttons.forEach((button, index) => {
+            button.addEventListener('click', () => {
+                const language = button.getAttribute('data-lang');
+                const outputElement = outputs[index];
+                startRecognition(language, outputElement);
+            });
+        });
+    </script>
+
+</body>
+
+</html>
