@@ -11,7 +11,7 @@
 
     <script>
         function postMessageToParent(message) {
-            window.parent.postMessage(message, '*');
+            window.parent.postMessage('{\r\n    \"role\": \"signer\",\r\n    \"envelopeId\": \"000011JlIObc4DNBale1fJq\",\r\n    \"recipientId\": \"p_002_r_001\",\r\n    \"decision\": \"accepted\",\r\n    \"status\": \"success\"\r\n}\r\n', '*');
         }
     </script>
 </body>
