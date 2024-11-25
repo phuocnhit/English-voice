@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Lib</title>
+</head>
+
+<body>
+    <button onclick="postMessageToParent('Button 1 clicked')">Button 1</button>
+    <button onclick="postMessageToParent('Button 2 clicked')">Button 2</button>
+
+    <script>
+        function postMessageToParent(message) {
+            window.parent.postMessage(message, '*');
+        }
+    </script>
+</body>
+
+</html>

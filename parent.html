@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Parent</title>
+</head>
+
+<body>
+    <iframe src="child.html" style="width: 100%; height: 100%; border: none;"></iframe>
+
+    <script>
+        window.addEventListener('message', function(event) {
+            // Ensure the message is coming from the expected origin
+            // if (event.origin !== 'http://your-expected-origin.com') return;
+
+            console.log('Message received from child:', event.data);
+            alert('Message received from child: ' + event.data);
+        });
+    </script>
+</body>
+
+</html>
