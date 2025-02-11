@@ -1,0 +1,38 @@
+<script>
+    let voices = [];
+
+    function populateVoiceList() {
+        voices = speechSynthesis.getVoices();
+        const voiceSelect = document.getElementById('voiceSelect');
+
+        voices.forEach((voice, index) => {
+            const option = document.createElement('option');
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.value = index;
+            voiceSelect.appendChild(option);
+        });
+    }
+
+    function textToSpeech() {
+        // Get the text from the input field
+        const text = document.getElementById('textInput').value;
+
+        // Create a new instance of SpeechSynthesisUtterance
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        // Set the selected voice
+        const selectedVoiceIndex = document.getElementById('voiceSelect').value;
+        utterance.voice = voices[selectedVoiceIndex];
+
+        // Speak the text
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // Populate the voice list when the voices are loaded
+    window.speechSynthesis.onvoiceschanged = populateVoiceList;
+</script>
+<div>
+    <input type="text" id="textInput" placeholder="Enter text here">
+    <select id="voiceSelect"></select>
+    <button onclick="textToSpeech()">Speak</button>
+</div>
