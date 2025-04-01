@@ -1,21 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF.js Base64 Example</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-
-          <style>
-        /* Make the canvas responsive */
-        #pdf-canvas {
-            width: 100%;
-            height: auto;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF.js Mobile Viewer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf_viewer.min.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f4f4f4;
+    }
+    #viewerContainer {
+      width: 100%;
+      max-width: 600px;
+      height: 90vh;
+      overflow: auto;
+      border: 1px solid #ccc;
+      background: white;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
-    <canvas id="pdf-canvas"></canvas>
-    <script src="app.js"></script>
+
+  <div id="viewerContainer">
+    <div id="pdfViewer" class="pdfViewer"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf_viewer.min.js"></script>
+
+  <script>
+    const url = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf'; // Replace with your PDF URL
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+    const loadingTask = pdfjsLib.getDocument(url);
+    loadingTask.promise.then(pdf => {
+      const pdfViewer = new pdfjsViewer.PDFViewer({
+        container: document.getElementById('viewerContainer'),
+      });
+
+      pdfViewer.setDocument(pdf);
+    });
+  </script>
+
 </body>
 </html>
