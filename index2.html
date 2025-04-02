@@ -135,10 +135,10 @@
     /*! CSS Used from: http://localhost:5038/css/site.css?v=oI0GUTiskQT2Rr0ab03Iu9OJrS6ktqfTl-323OkDw8w */
     .btn:focus,.btn:active:focus{box-shadow:0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;}
     body{margin-bottom:60px;}
-    #pdfContainer{position:relative;width:100%;border:1px solid #ccc;margin-bottom:10px;overflow:hidden;}
+    #pdfContainer{position:relative;width:100%;border:1px solid #ccc;overflow:hidden;}
     .text-right{text-align:right;}
     #pdfCanvas{width:100%;height:100%;}
-    .signatureRect{position:absolute;border:2px solid brown;width:100px;height:50px;cursor:move;background:rgba(0, 0, 0, 0.3);text-align:center;align-content:center;color:brown;border-radius:8px;font-weight:bold;font-size:11px;}
+    .signatureRect{position:absolute;width:100px;height:50px;cursor:move;background:rgba(0, 0, 0, 0.3);text-align:center;align-content:center;color:brown;border-radius:8px;font-weight:bold;font-size:11px;}
     #thumbnails{display:flex;gap:5px;overflow-x:auto;margin-top:10px;border:1px solid #ccc;padding:5px;}
     .thumbnail{cursor:pointer;width:80px;border:1px solid #ddd;transition:border 0.3s;}
     .thumbnail:hover{border:1px solid #000;}
@@ -266,7 +266,6 @@
     }
     .btn:focus,.btn:active:focus{box-shadow:0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;}
     body{margin-bottom:60px;}
-    #pdfContainer{position:relative;width:100%;border:1px solid #ccc;margin-bottom:10px;overflow:hidden;}
     .text-right{text-align:right;}
     #pdfCanvas{width:100%;height:100%;}
     #thumbnails{display:flex;gap:5px;overflow-x:auto;margin-top:10px;border:1px solid #ccc;padding:5px;}
@@ -290,12 +289,7 @@
           <div id="success-alert" class="alert alert-success alert-dismissible fade" role="alert">
               Thành công!
           </div>
-          <div id="pdfContainer" class="border">
-              <div class="d-flex justify-content-between mb-2 none">
-                  <span>scale: <label id="scalePDF">0</label></span>
-                  <span>x: <label id="x">0</label></span>
-                  <span>y: <label id="y">0</label></span>
-              </div>
+          <div id="pdfContainer" class="border">              
               <canvas id="pdfCanvas" class="w-100"></canvas>
           </div>
     
@@ -344,9 +338,9 @@
     const submitBtn = document.getElementById("submitBtn");
     const pageInfo = document.getElementById("pageInfo");
     const thumbnails = document.getElementById("thumbnails");
-    const vitriX = document.getElementById("x");
-    const vitriY = document.getElementById("y");
-    const scalePDF = document.getElementById("scalePDF");
+    let vitriX = 0;
+    let vitriY = 0;
+    let scalePDF = 1;
     const signatureWidth = urlParams.get("width") || 130;
     const signatureHeight = urlParams.get("height") || 70;
     let imgbase64 = "";
@@ -367,11 +361,11 @@
     
         // Tính toán tỉ lệ scale dựa trên chiều rộng container
         const scale = containerWidth / viewport.width;
-        scalePDF.innerText = scale;
+        scalePDF = scale;
         const scaledViewport = page.getViewport({ scale: scale });
     
         // Điều chỉnh chiều cao container theo tỉ lệ PDF
-        pdfContainer.style.height = `${scaledViewport.height}px`;
+        //pdfContainer.style.height = `${scaledViewport.height}px`;
     
         // Cập nhật kích thước canvas
         pdfCanvas.width = scaledViewport.width;
@@ -391,8 +385,8 @@
     };
     
     const updateSignatureRectSize = () => {
-        const width = (parseInt(signatureWidth, 10) || 130) * parseFloat(scalePDF.innerText);
-        const height = (parseInt(signatureHeight, 10) || 70) * parseFloat(scalePDF.innerText);
+        const width = (parseInt(signatureWidth, 10) || 130) * parseFloat(scalePDF);
+        const height = (parseInt(signatureHeight, 10) || 70) * parseFloat(scalePDF);
         if (signatureRect != null) {
             signatureRect.style.width = `${width}px`;
             signatureRect.style.height = `${height}px`;
@@ -530,8 +524,8 @@
                     signatureRect.style.left = `${left}px`;
                     signatureRect.style.top = `${top}px`;
     
-                    vitriX.innerText = Math.round(left / parseFloat(scalePDF.innerText));
-                    vitriY.innerText = Math.round(top / parseFloat(scalePDF.innerText));
+                    vitriX = Math.round(left / parseFloat(scalePDF));
+                    vitriY = Math.round(top / parseFloat(scalePDF));
                 }
             };
     
@@ -561,8 +555,8 @@
         submitBtn.addEventListener("click", async () => {
     
             const coordinates = {
-                x: Math.round(vitriX.innerText),
-                y: Math.round(vitriY.innerText),
+                x: Math.round(vitriX),
+                y: Math.round(vitriY),
                 pageNum: currentPage,
                 pdfViewWidth: Math.round(pdfContainer.offsetWidth),
                 pdfViewHeight: Math.round(pdfContainer.offsetHeight)
