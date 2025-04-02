@@ -291,7 +291,7 @@
               Thành công!
           </div>
           <div id="pdfContainer" class="border">
-              <div class="d-flex justify-content-between mb-2">
+              <div class="d-flex justify-content-between mb-2 none">
                   <span>scale: <label id="scalePDF">0</label></span>
                   <span>x: <label id="x">0</label></span>
                   <span>y: <label id="y">0</label></span>
@@ -596,7 +596,7 @@
             var temp = { "command": "daky", "data": data };
             
             console.log(JSON.stringify(temp));
-            window.ReactNativeWebView.postMessage(temp);
+            window.ReactNativeWebView.postMessage(JSON.stringify(temp));
             //fetch(`${appBaseUrl}/simpki/xacnhanvungky`, {
             //    method: "POST",
             //    headers: { "Content-Type": "application/json", "Accept": "*/*" },
