@@ -593,7 +593,9 @@
             //    viewport.width, viewport.height, signatureConfig.width, signatureConfig.height);
     
             var temp = { "command": "daky", "data": data };
-            
+            data.trangky = currentPage;
+            data.coordinates = coordinates;
+            data.viewport = viewport;
             console.log(JSON.stringify(temp));
             window.ReactNativeWebView.postMessage(JSON.stringify(temp));
             //fetch(`${appBaseUrl}/simpki/xacnhanvungky`, {
