@@ -276,15 +276,26 @@
     #addSignatureBtn,#submitBtn{width:100%;}
     }
     .navbar{display:none;}
-    
+    body {
+    font-family: 'Roboto';font-size: 40px;
+}
     </style>
-    <div class="container2">
+    <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet'>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-6">
+                <button id="addSignatureBtn" class="btn btn-success w-100">Chọn vị trí ký</button>
+                <button id="submitBtn" class="btn btn-primary w100">Xác nhận</button>      
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
     <div class="row">
       <!-- PDF viewer container -->
       <div class="offset-lg-2 col-lg-6">
           <div class="text-right mb-3">
-              <button id="addSignatureBtn" class="btn btn-success">Chọn vị trí ký</button>
-              <button id="submitBtn" class="btn btn-primary">Xác nhận</button>
+              <!-- <button id="addSignatureBtn" class="btn btn-success ">Chọn vị trí ký</button>
+              <button id="submitBtn" class="btn btn-primary">Xác nhận</button> -->
           </div>
           <div id="success-alert" class="alert alert-success alert-dismissible fade" role="alert">
               Thành công!
