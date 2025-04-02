@@ -11,7 +11,7 @@ loadingTask.promise.then(function (pdf) {
     pdf.getPage(1).then(function (page) {
         // Adjust the scale based on the window width (responsive scaling)
         const scale = window.innerWidth / page.getViewport({ scale: 1 }).width;
-        const viewport = page.getViewport({ scale: scale });
+        const viewport = page.getViewport({ scale: 1});
 
         // Prepare the canvas and context
         const canvas = document.getElementById('pdf-canvas');
