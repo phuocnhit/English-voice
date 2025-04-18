@@ -1,0 +1,21 @@
+<script src="https://cdn.jsdelivr.net/gh/kripken/mespeak.js/mespeak.min.js"></script>
+<script>
+  mespeak.loadConfig("https://cdn.jsdelivr.net/gh/kripken/mespeak.js/mespeak_config.json");
+  mespeak.loadVoice("https://cdn.jsdelivr.net/gh/kripken/mespeak.js/voices/en/en-us.json");
+
+  function generateAudio() {
+    const text = "Hello, this is a test with meSpeak.js!";
+    const audioData = mespeak.speak(text, { rawdata: "buffer" });
+
+    const blob = new Blob([new Uint8Array(audioData)], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "speech.wav";
+    a.textContent = "Download Speech";
+    document.body.appendChild(a);
+  }
+
+  generateAudio();
+</script>
