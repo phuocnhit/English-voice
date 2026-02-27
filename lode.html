@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Console 2.5D Demo</title>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #virtualJoystick {
+            position: fixed;
+            left: 24px;
+            bottom: 24px;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            background: rgba(255, 255, 255, 0.08);
+            touch-action: none;
+            user-select: none;
+            z-index: 20;
+            display: none;
+        }
+
+        #virtualJoystick .stick {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 56px;
+            height: 56px;
+            margin-left: -28px;
+            margin-top: -28px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            transform: translate(0px, 0px);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div id="virtualJoystick" aria-hidden="true"><div class="stick"></div></div>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+
+        const createScene = function () {
+
+            const scene = new BABYLON.Scene(engine);
+            //scene.clearColor = new BABYLON.Color4(0.05, 0.1, 0.15, 1);
+
+            // ================= CAMERA (Console Style) =================
+            const camera = new BABYLON.FreeCamera("cam",
+                new BABYLON.Vector3(0, 0, 0),
+                scene);
+
+            // góc cố định giống console
+            camera.rotation.x = 0.8;   // độ nghiêng xuống
+            camera.rotation.y = 0;
+            camera.rotation.z = 0;
+
+            let cameraBaseY = 12;
+            let cameraBaseZ = -22;
+
+            const deadZone = 2;
+            const followSpeed = 0.08;
+            // Lode Runner camera settings
+            let cameraTargetX = 0;
+            const cameraSnapSpeed = 0.12;
+            const cameraDeadTiles = 2;
+            let freezeCamera = false; // set false so camera can move
+
+            // ================= LIGHT =================
+            const light = new BABYLON.DirectionalLight("light",
+                new BABYLON.Vector3(-0.5, -1, 0.5),
+                scene);
+            light.position = new BABYLON.Vector3(20, 30, -20);
+
+            const shadowGen = new BABYLON.ShadowGenerator(1024, light);
+            shadowGen.useBlurExponentialShadowMap = true;
+
+            // ================= MATERIAL =================
+            function mat(color) {
+                const m = new BABYLON.StandardMaterial("m", scene);
+                m.diffuseColor = color;
+                return m;
+            }
+
+            const brickMat = mat(new BABYLON.Color3(0.8, 0.6, 0.3));
+            const goldMat = mat(new BABYLON.Color3(1, 0.8, 0.2));
+            goldMat.emissiveColor = new BABYLON.Color3(0.6, 0.4, 0);
+            const ladderMat = mat(new BABYLON.Color3(0.2, 0.8, 0.3));
+            const playerMat = mat(new BABYLON.Color3(0.2, 0.6, 1));
+
+            // BACKGROUND / PARALLAX config
+            let bg = null;
+            const bgWorldZ = 40; // z world của plane background
+            const parallaxFactor = 0.3; // <1 => di chuyển chậm hơn camera
+
+            // ================= MAP =================
+            const map = [
+                "..................S.........",
+                "....G.............S.........",
+                "#######L#######...S.........",
+                ".......L##########S....G....",
+                ".......L....##L...#######L##",
+                ".......L....##L..........L..",
+                ".......L....##L.......G..L..",
+                "##L#####....########L#######",
+                "..L.................L.......",
+                "..L.................L.......",
+                "#########L##########L.......",
+                ".........L..........L.......",
+                ".......G.L##########L...G...",
+                "....L######.........#######L",
+                "....L............G.........L",
+                "############################",
+            ];
+
+            const tileSize = 2;
+            const solids = [];
+            const ladders = [];
+            const golds = [];
+
+            function createBrickAt(worldX, worldY) {
+                const block = BABYLON.MeshBuilder.CreateBox("b", { size: tileSize }, scene);
+                block.position.set(worldX, worldY, 0);
+                block.material = brickMat;
+                block.receiveShadows = true;
+                solids.push(block);
+                return block;
+            }
+
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+
+                    const char = map[y][x];
+                    const worldX = x * tileSize;
+                    const worldY = (map.length - y) * tileSize;
+
+                    if (char === "#") {
+                        createBrickAt(worldX, worldY);
+                    }
+
+                    if (char === "L") {
+                        const ladder = BABYLON.MeshBuilder.CreateBox("l",
+                            { width: tileSize, height: tileSize, depth: tileSize * 0.25 }, scene);
+                        ladder.position.set(worldX, worldY, 0);
+                        ladder.material = ladderMat;
+                        ladders.push(ladder);
+                    }
+
+                    if (char === "G") {
+                        console.log("Creating gold at", worldX, worldY);
+                        const gold = BABYLON.MeshBuilder.CreateCylinder("g",
+                            { diameter: 1, height: 0.5 }, scene);
+                        gold.position.set(worldX, worldY, 0);
+                        gold.material = goldMat;
+                        shadowGen.addShadowCaster(gold);
+                        golds.push(gold);
+                    }
+
+                }
+            }
+
+            // ================= PLAYER =================
+            // Compute map bounds and position camera to frame the map
+            try {
+                const minX = 0;
+                const maxX = (map[0].length - 1) * tileSize;
+                const centerX = (minX + maxX) / 2;
+                const topY = map.length * tileSize;
+                const centerY = topY / 2;
+                const maxDim = Math.max(maxX - minX, topY);
+
+                // Zoom control: <1 => closer (map appears larger), >1 => farther
+                const cameraZoom = 4; // change to e.g. 0.7 to make map even bigger
+                const baseOffset = 20;
+
+                cameraBaseY = Math.max(8, centerY + maxDim * 0.15);
+                cameraBaseZ = - (maxDim * 1.2 * (1 / cameraZoom) + baseOffset);
+
+                camera.position = new BABYLON.Vector3(centerX, cameraBaseY, cameraBaseZ);
+                camera.setTarget(new BABYLON.Vector3(centerX, centerY, 0));
+            } catch (e) {
+                console.warn('Camera framing failed:', e);
+            }
+            const player = BABYLON.MeshBuilder.CreateBox("player",
+                { size: 1.5 }, scene);
+            player.position.set(4, 12, 0);
+            player.material = playerMat;
+            shadowGen.addShadowCaster(player);
+            const playerHalfHeight = 0.75;
+            const blockHalfHeight = tileSize / 2;
+
+            // initialize camera target to player's current column
+            cameraTargetX = Math.round(player.position.x / tileSize) * tileSize;
+
+            let velocityY = 0;
+            const gravity = -0.02;
+            const speed = 0.18;
+            const ladderStepThreshold = 0.55;
+            let onGround = false;
+            let onLadder = false;
+            const ladderTopCatch = 0.45;
+            const brickRespawnMs = 3000;
+            // Lock player to nearest column while falling
+            let fallingLock = false;
+            let targetFallX = 0;
+
+            // ================= INPUT =================
+            const keys = {};
+            const virtualKeys = {
+                ArrowLeft: false,
+                ArrowRight: false,
+                ArrowUp: false,
+                ArrowDown: false,
+            };
+            window.addEventListener("keydown", e => keys[e.key] = true);
+            window.addEventListener("keyup", e => keys[e.key] = false);
+
+            function isPressed(key) {
+                return !!keys[key] || !!virtualKeys[key];
+            }
+
+            const joystickRoot = document.getElementById("virtualJoystick");
+            const joystickStick = joystickRoot.querySelector(".stick");
+            const hasTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+            if (hasTouch) {
+                joystickRoot.style.display = "block";
+            }
+
+            const joystickState = {
+                pointerId: null,
+                x: 0,
+                y: 0,
+            };
+            const joystickMaxRadius = 44;
+            const joystickThreshold = 0.35;
+
+            function applyJoystickDirection(dx, dy) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const clampedDistance = Math.min(distance, joystickMaxRadius);
+                const scale = distance > 0 ? (clampedDistance / distance) : 0;
+
+                const stickX = dx * scale;
+                const stickY = dy * scale;
+                joystickStick.style.transform = `translate(${stickX}px, ${stickY}px)`;
+
+                joystickState.x = stickX / joystickMaxRadius;
+                joystickState.y = stickY / joystickMaxRadius;
+
+                virtualKeys.ArrowLeft = joystickState.x < -joystickThreshold;
+                virtualKeys.ArrowRight = joystickState.x > joystickThreshold;
+                virtualKeys.ArrowUp = joystickState.y < -joystickThreshold;
+                virtualKeys.ArrowDown = joystickState.y > joystickThreshold;
+            }
+
+            function resetJoystick() {
+                joystickStick.style.transform = "translate(0px, 0px)";
+                joystickState.pointerId = null;
+                joystickState.x = 0;
+                joystickState.y = 0;
+                virtualKeys.ArrowLeft = false;
+                virtualKeys.ArrowRight = false;
+                virtualKeys.ArrowUp = false;
+                virtualKeys.ArrowDown = false;
+            }
+
+            function updateJoystickFromEvent(event) {
+                const bounds = joystickRoot.getBoundingClientRect();
+                const centerX = bounds.left + bounds.width / 2;
+                const centerY = bounds.top + bounds.height / 2;
+                const dx = event.clientX - centerX;
+                const dy = event.clientY - centerY;
+                applyJoystickDirection(dx, dy);
+            }
+
+            joystickRoot.addEventListener("pointerdown", (event) => {
+                if (!hasTouch) return;
+                joystickState.pointerId = event.pointerId;
+                joystickRoot.setPointerCapture(event.pointerId);
+                updateJoystickFromEvent(event);
+            });
+
+            joystickRoot.addEventListener("pointermove", (event) => {
+                if (joystickState.pointerId !== event.pointerId) return;
+                updateJoystickFromEvent(event);
+            });
+
+            joystickRoot.addEventListener("pointerup", (event) => {
+                if (joystickState.pointerId !== event.pointerId) return;
+                resetJoystick();
+            });
+
+            joystickRoot.addEventListener("pointercancel", (event) => {
+                if (joystickState.pointerId !== event.pointerId) return;
+                resetJoystick();
+            });
+
+            function digBrick(direction) {
+                // Lấy vị trí chân player để biết đang đứng trên hàng gạch nào.
+                const playerFeetY = player.position.y - playerHalfHeight;
+                const standingBlockY = Math.round((playerFeetY - blockHalfHeight) / tileSize) * tileSize;
+                const playerColX = Math.round(player.position.x / tileSize) * tileSize;
+
+                // Ô gạch mục tiêu cần đào: cùng hàng với chân, lệch trái/phải 1 tile.
+                const targetX = playerColX + direction * tileSize;
+                const targetY = standingBlockY;
+
+                // Tìm viên gạch đúng ô mục tiêu (dùng sai số nhỏ để tránh lệch float).
+                const blockIndex = solids.findIndex(s =>
+                    Math.abs(s.position.x - targetX) < 0.1 &&
+                    Math.abs(s.position.y - targetY) < 0.1
+                );
+                if (blockIndex === -1) return;
+
+                // Không cho đào nếu còn gạch đè phía trên ô mục tiêu.
+                const hasBlockAbove = solids.some(s =>
+                    Math.abs(s.position.x - targetX) < 0.1 &&
+                    Math.abs(s.position.y - (targetY + tileSize)) < 0.1
+                );
+                if (hasBlockAbove) return;
+
+                // Lưu vị trí để hồi gạch sau một khoảng thời gian.
+                const removedBlock = solids[blockIndex];
+                const restoreX = removedBlock.position.x;
+                const restoreY = removedBlock.position.y;
+
+                // Xóa gạch khỏi danh sách va chạm và khỏi scene.
+                solids.splice(blockIndex, 1);
+                removedBlock.dispose();
+
+                // Hồi lại gạch sau brickRespawnMs.
+                setTimeout(() => {
+                    createBrickAt(restoreX, restoreY);
+                }, brickRespawnMs);
+            }
+
+            window.addEventListener("keydown", e => {
+                if (e.repeat) return;
+                if (e.key === "a" || e.key === "A") digBrick(-1);
+                if (e.key === "b" || e.key === "B") digBrick(1);
+            });
+
+            // ================= COLLISION =================
+            function checkGround() {
+                onGround = false;
+                for (let s of solids) {
+                    if (Math.abs(s.position.x - player.position.x) < 1 &&
+                        Math.abs(s.position.y - (player.position.y - 1)) < 1) {
+                        player.position.y = s.position.y + blockHalfHeight + playerHalfHeight;
+                        velocityY = 0;
+                        onGround = true;
+                    }
+                }
+            }
+
+            function getStandingBrick() {
+                for (let s of solids) {
+                    if (Math.abs(s.position.x - player.position.x) < 1 &&
+                        Math.abs(s.position.y - (player.position.y - 1)) < 1) {
+                        return s;
+                    }
+                }
+                return null;
+            }
+
+            function isBlockedAtX(nextX) {
+                const verticalReach = blockHalfHeight + playerHalfHeight - 0.05;
+                for (let s of solids) {
+                    const hitX = Math.abs(s.position.x - nextX) < (blockHalfHeight + 0.75);
+                    const hitY = Math.abs(s.position.y - player.position.y) < verticalReach;
+                    if (hitX && hitY) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function tryStepOffLadderToBrick(direction, nextX) {
+                if (!onLadder) return false;
+
+                const currentLadder = getCurrentLadder();
+                if (!currentLadder) return false;
+
+                const targetBrickX = currentLadder.position.x + direction * tileSize;
+                const playerFeetY = player.position.y - playerHalfHeight;
+
+                let targetStandY = null;
+                let targetBrickTopY = null;
+                let nearestDiff = Number.POSITIVE_INFINITY;
+
+                for (let s of solids) {
+                    if (Math.abs(s.position.x - targetBrickX) > 0.1) continue;
+
+                    const brickTopY = s.position.y + blockHalfHeight;
+                    const standY = brickTopY + playerHalfHeight;
+                    const canReachBrickSurface = playerFeetY >= (brickTopY - ladderStepThreshold);
+                    const reachableStep = Math.abs(player.position.y - standY) <= (playerHalfHeight + ladderStepThreshold);
+
+                    if (canReachBrickSurface && reachableStep) {
+                        const diff = Math.abs(player.position.y - standY);
+                        if (diff < nearestDiff) {
+                            nearestDiff = diff;
+                            targetStandY = standY;
+                            targetBrickTopY = brickTopY;
+                        }
+                    }
+                }
+
+                if (targetStandY === null) return false;
+
+                const sideBlockReachY = blockHalfHeight + playerHalfHeight - 0.05;
+                const blockedByWallAboveTarget = solids.some(s =>
+                    Math.abs(s.position.x - targetBrickX) < 0.1 &&
+                    (s.position.y + blockHalfHeight) > (targetBrickTopY + 0.05) &&
+                    Math.abs(s.position.y - player.position.y) < sideBlockReachY
+                );
+                if (blockedByWallAboveTarget) return false;
+
+                player.position.x = nextX;
+                player.position.y = targetStandY;
+                velocityY = 0;
+                onGround = true;
+                onLadder = false;
+                fallingLock = false;
+                return true;
+            }
+
+            function tryEnterLadderFromBrick() {
+                if (onLadder) return false;
+                if (!isPressed("ArrowDown") && !isPressed("ArrowUp")) return false;
+
+                const standingBrick = getStandingBrick();
+                if (!standingBrick) return false;
+
+                const playerFeetY = player.position.y - playerHalfHeight;
+                let targetLadder = null;
+                let nearestDx = Number.POSITIVE_INFINITY;
+
+                for (let l of ladders) {
+                    const dx = Math.abs(l.position.x - player.position.x);
+                    if (dx > 0.85) continue;
+
+                    const ladderTopY = l.position.y + tileSize / 2;
+                    const ladderBottomY = l.position.y - tileSize / 2;
+                    const canEnterDown = isPressed("ArrowDown") && Math.abs(playerFeetY - ladderTopY) <= (playerHalfHeight + ladderStepThreshold);
+                    const canEnterUp = isPressed("ArrowUp") && Math.abs(playerFeetY - ladderBottomY) <= (playerHalfHeight + ladderStepThreshold);
+
+                    if (canEnterDown || canEnterUp) {
+                        if (dx < nearestDx) {
+                            nearestDx = dx;
+                            targetLadder = l;
+                        }
+                    }
+                }
+
+                if (!targetLadder) return false;
+
+                player.position.x = targetLadder.position.x;
+                onLadder = true;
+                onGround = false;
+                velocityY = 0;
+                fallingLock = false;
+                return true;
+            }
+
+            function checkLadder() {
+                onLadder = false;
+                for (let l of ladders) {
+                    const dx = Math.abs(l.position.x - player.position.x);
+                    const playerFeetY = player.position.y - playerHalfHeight;
+                    const ladderTopY = l.position.y + tileSize / 2;
+                    const ladderBottomY = l.position.y - tileSize / 2;
+                    const feetInsideLadder = playerFeetY <= ladderTopY + ladderTopCatch && playerFeetY >= ladderBottomY - 0.05;
+
+                    if (dx < 1 && feetInsideLadder) {
+                        onLadder = true;
+                    }
+                }
+            }
+
+            function getCurrentLadder() {
+                let nearest = null;
+                let nearestDist = Number.POSITIVE_INFINITY;
+                for (let l of ladders) {
+                    const dx = Math.abs(l.position.x - player.position.x);
+                    const playerFeetY = player.position.y - playerHalfHeight;
+                    const ladderTopY = l.position.y + tileSize / 2;
+                    const ladderBottomY = l.position.y - tileSize / 2;
+                    const feetInsideLadder = playerFeetY <= ladderTopY + ladderTopCatch && playerFeetY >= ladderBottomY - 0.05;
+
+                    if (dx < 1 && feetInsideLadder) {
+                        const dy = Math.abs(l.position.y - player.position.y);
+                        const dist = dx + dy;
+                        if (dist < nearestDist) {
+                            nearestDist = dist;
+                            nearest = l;
+                        }
+                    }
+                }
+                return nearest;
+            }
+
+            // ================= UI =================
+            const ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+            const goldText = new BABYLON.GUI.TextBlock();
+            goldText.text = "Gold: 0";
+            goldText.color = "#FFD700";
+            goldText.fontSize = 22;
+            goldText.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            goldText.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            goldText.paddingLeft = "20px";
+            goldText.paddingTop = "20px";
+            ui.addControl(goldText);
+
+            let goldCount = 0;
+
+            // ================= GAME LOOP =================
+            scene.onBeforeRenderObservable.add(() => {
+
+                // Movement (disabled while locked into falling column)
+                if (!fallingLock) {
+                    if (isPressed("ArrowLeft")) {
+                        const nextX = player.position.x - speed;
+                        const steppedFromLadder = tryStepOffLadderToBrick(-1, nextX);
+                        if (steppedFromLadder) {
+                            // handled by ladder-to-brick transition
+                            console.log("Stepped off ladder to brick on the left");
+                        } else if (!isBlockedAtX(nextX)) {
+                            player.position.x = nextX;
+                        }
+                    }
+                    if (isPressed("ArrowRight")) {
+                        const nextX = player.position.x + speed;
+                        const steppedFromLadder = tryStepOffLadderToBrick(1, nextX);
+                        if (steppedFromLadder) {
+                            // handled by ladder-to-brick transition
+                        } else if (!isBlockedAtX(nextX)) {
+                            player.position.x = nextX;
+                        }
+                    }
+                } else {
+                    // gently snap toward the column center while falling
+                    player.position.x = BABYLON.Scalar.Lerp(player.position.x, targetFallX, 0.25);
+                }
+
+                tryEnterLadderFromBrick();
+
+                checkLadder();
+
+                if (onLadder) {
+                    let canClimbUp = true;
+                    const currentLadder = getCurrentLadder();
+                    if (currentLadder) {
+                        if (isPressed("ArrowDown") || isPressed("ArrowUp")) {
+                            player.position.x = BABYLON.Scalar.Lerp(player.position.x, currentLadder.position.x, 0.45);
+                            if (Math.abs(player.position.x - currentLadder.position.x) < 0.02) {
+                                player.position.x = currentLadder.position.x;
+                            }
+                        }
+
+                        const ladderAbove = ladders.some(l =>
+                            Math.abs(l.position.x - currentLadder.position.x) < 0.1 &&
+                            l.position.y > currentLadder.position.y &&
+                            (l.position.y - currentLadder.position.y) <= tileSize + 0.1
+                        );
+
+                        if (!ladderAbove) {
+                            const topY = currentLadder.position.y + blockHalfHeight + playerHalfHeight;
+                            if (player.position.y >= topY) {
+                                player.position.y = topY;
+                                canClimbUp = false;
+                            }
+                        }
+                    }
+
+                    if (isPressed("ArrowUp") && canClimbUp) player.position.y += speed;
+                    if (isPressed("ArrowDown")) player.position.y -= speed;
+                    velocityY = 0;
+                    fallingLock = false; // climbing cancels falling lock
+                } else {
+                    checkGround();
+
+                    if (!onGround) {
+                        velocityY += gravity;
+                        player.position.y += velocityY;
+                        checkGround();
+                    } else {
+                        velocityY = 0;
+                    }
+
+                    // If starting to fall (moving downward, not on ground/ladder), lock to nearest column
+                    if (!onGround && !onLadder && velocityY < 0 && !fallingLock) {
+                        fallingLock = true;
+                        targetFallX = Math.round(player.position.x / tileSize) * tileSize;
+                    }
+                }
+
+                // landing cancels falling lock
+                if (onGround) fallingLock = false;
+
+                if (isPressed(" ") && onGround) velocityY = 0.55;
+
+                // Collect gold
+                for (let i = golds.length - 1; i >= 0; i--) {
+                    const nearX = Math.abs(player.position.x - golds[i].position.x) < 0.9;
+                    const nearY = Math.abs(player.position.y - golds[i].position.y) < 1.0;
+                    if (nearX && nearY) {
+                        golds[i].dispose();
+                        golds.splice(i, 1);
+                        goldCount++;
+                        goldText.text = "Gold: " + goldCount;
+                    }
+                }
+
+                // ================= CAMERA FOLLOW X ONLY =================
+                // const diff = player.position.x - camera.position.x;
+
+                // if (Math.abs(diff) > deadZone) {
+                //     camera.position.x = BABYLON.Scalar.Lerp(
+                //         camera.position.x,
+                //         player.position.x,
+                //         followSpeed
+                //     );
+                // }
+
+                // // giữ Y và Z cố định như console
+                // camera.position.y = cameraBaseY;
+                // camera.position.z = cameraBaseZ;
+
+                // // Parallax background: di chuyển chậm hơn player/camera
+                // if (bg) {
+                //     const targetX = camera.position.x * parallaxFactor;
+                //     bg.position.x = BABYLON.Scalar.Lerp(bg.position.x, targetX, 0.08);
+                //     const targetY = camera.position.y * parallaxFactor * 0.2 + cameraBaseY * 0.2;
+                //     bg.position.y = BABYLON.Scalar.Lerp(bg.position.y, targetY, 0.08);
+                //     bg.position.z = bgWorldZ;
+                //     bg.rotation = camera.rotation.clone();
+                // }
+
+            });
+
+            // ================= BACKGROUND PLANE (parallax) =================
+            try {
+                bg = BABYLON.MeshBuilder.CreatePlane("bg_plane", { width: 200, height: 120 }, scene);
+                bg.position = new BABYLON.Vector3(camera.position.x * parallaxFactor, cameraBaseY * 0.2, bgWorldZ);
+                bg.isPickable = false;
+                bg.receiveShadows = false;
+
+                const bgMat = new BABYLON.StandardMaterial("bgMat", scene);
+                bgMat.diffuseTexture = new BABYLON.Texture("background-lode.png", scene);
+                bgMat.disableLighting = true;
+                bgMat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+                bgMat.backFaceCulling = false;
+                bg.material = bgMat;
+
+                // đảm bảo background vẽ trước các object chính (ở layer thấp)
+                bg.renderingGroupId = 0;
+            } catch (e) {
+                console.warn('Không thể tạo background plane:', e);
+            }
+
+            return scene;
+        };
+
+        const scene = createScene();
+        window.scene = scene;
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "F2") {
+                if (scene.debugLayer.isVisible()) {
+                    scene.debugLayer.hide();
+                } else {
+                    scene.debugLayer.show({ overlay: true });
+                }
+            }
+        });
+
+        engine.runRenderLoop(() => scene.render());
+        window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+
+</html>
